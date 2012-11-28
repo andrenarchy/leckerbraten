@@ -36,6 +36,7 @@ if plot:
     lmbda.interpolate(Diffusivity())
     File('cont.pvd') << lmbda
 
+mesh = UnitCube(10,10,10)
 V = FunctionSpace(mesh, 'CG', 1)
 
 u0 = Constant(350.0)
@@ -67,10 +68,15 @@ t = dt
 w_1 = Function(V)
 w_1.assign(w)
 
+# boundary condition:
+# n \dot grad(u) = alpha * (u - Tenv)
+alpha = 1
+Tenv = 350
+
 # backward Euler
 lambd = Diffusivity()
-a = u*v*dx + dt*inner( grad(u), grad(v))*dx
-L = w_1*v*dx  # rhs == 0
+a = u*v*dx + dt*inner( grad(u), grad(v))*dx + dt*alpha*u*v*ds(0)
+L = w_1*v*dx  + dt*alpha*Tenv*v*ds # rhs == 0
 
 # reactionary (forward) Euler
 #a = u*v*dx 
@@ -86,7 +92,7 @@ while t <= T:
     prm['monitor_convergence'] = True
     #solve(M, y.vector(), b,
     solve(a == L, w,
-          bcs = bc,
+          #bcs = bc,
           )#solver_parameters={'linear_solver': 'cg',
            #                  'preconditioner': 'amg'})
 
