@@ -1,91 +1,97 @@
 from dolfin import *
 import numpy
 
-mesh = Mesh('coils3d.xml')
-subdomains = MeshFunction('uint', mesh, 'coils3d_physical_region.xml')
+#parameters['linear_algebra_backend'] = 'uBLAS'
+
+mesh = Mesh('msh_pan.xml')
+subdomains = MeshFunction('uint', mesh, 'msh_pan_physical_region.xml')
 
 # Manually specify this. In the future,
 # Dolfin will be able to do this automatically.
-subdomain_classification = {1: 'coil',
-                            2: 'coil',
-                            3: 'brick',
-                            4: 'air'
+subdomain_classification = {1: 'pan',
+                            2: 'handle',
+                            3: 'steak'
                             }
 
+
 # Setting heat conductivity.
-V0 = FunctionSpace(mesh, 'DG', 0)
-lambda_values = {'coil': 1.0,
-                 'brick': 0.1,
-                 'air': 0.8
+lambda_values = {'pan': 1.0, #1.172e-5,
+                 'handle': 1.0, # 8.2e-8,
+                 # steak: cf. P.S. Sheridana, N.C. Shilton, http://www.sciencedirect.com/science/article/pii/S0260877401000838
+                 'steak': 1.0 #1.5e-7   
                  }
 # Define a custom Expression().
-class Conductivity(Expression):
+class Diffusivity(Expression):
     def eval_cell(self, values, x, cell):
         subdomain_id = subdomains.array()[cell.index]
         clss = subdomain_classification[subdomain_id]
         values[0] = lambda_values[clss]
         return
-lmbda = Function(V0)
-lmbda.interpolate(Conductivity())
-File('cont.pvd') << lmbda
 
-# Define a custom Expression() for the heater.
-heater_values = {'coil': 1.0,
-                 'brick': 0.0,
-                 'air': 0.0
-                 }
-class Heater(Expression):
-    def eval_cell(self, values, x, cell):
-        subdomain_id = subdomains.array()[cell.index]
-        clss = subdomain_classification[subdomain_id]
-        values[0] = heater_values[clss]
-        return
-heater = Function(V0)
-heater.interpolate(Heater())
+# only needed for plotting
+plot = True
+if plot:
+    V0 = FunctionSpace(mesh, 'DG', 0) 
+    lmbda = Function(V0)
+    lmbda.interpolate(Diffusivity())
+    File('cont.pvd') << lmbda
 
 V = FunctionSpace(mesh, 'CG', 1)
 
-File('cont.pvd') << lmbda
-u0 = Constant(0.0)
+u0 = Constant(350.0)
 def u0_boundary(x, on_boundary):
-    return on_boundary
+    # TODO: use physical region
+    return on_boundary and x[2]<1e-12
 bc = DirichletBC(V, u0, u0_boundary)
 # Define variational problem
 u = TrialFunction(V)
 v = TestFunction(V)
-f = heater
 
 # do the actual time stepping
-T = 0.5
-dt = 1.0e-2
-y = project(Constant(0.0), V)
-yfile = File('solution.pvd')
-yfile << y
+T = 1.0
+dt = 1.0e-5
+w = Function(V)
+w.interpolate(Constant(293.0))
+#w.interpolate(Expression('350 - 100*x[2]'))
+
+# this works:
+#w.interpolate(Expression('293+57*exp(-1*x[2])'))
+# this doesn't work:
+#w.interpolate(Expression('293+57*exp(-100*x[2])'))
+
+wfile = File('solution.pvd')
+wfile << w
 t = dt
 
 # Previous time step.
-y_1 = Function(V)
-y_1.assign(y)
+w_1 = Function(V)
+w_1.assign(w)
 
 # backward Euler
-a = u*v*dx + dt*inner(lmbda * nabla_grad(u), nabla_grad(v))*dx
-L = y_1*v*dx + dt*f*v*dx
+lambd = Diffusivity()
+a = u*v*dx + dt*inner( grad(u), grad(v))*dx
+L = w_1*v*dx  # rhs == 0
+
+# reactionary (forward) Euler
+#a = u*v*dx 
+#L = w_1*v*dx - dt*inner( grad(w_1), grad(v))*dx
 
 while t <= T:
     print t
     # Homogenous boundary conditions don't require changing the system.
     prm = parameters['krylov_solver'] # short form
     prm['absolute_tolerance'] = 1E-10
-    prm['relative_tolerance'] = 1E-6
+    prm['relative_tolerance'] = 1E-14
     prm['maximum_iterations'] = 100
-    prm['monitor_convergence'] = False
+    prm['monitor_convergence'] = True
     #solve(M, y.vector(), b,
-    solve(a == L, y,
-          solver_parameters={'linear_solver': 'cg',
-                             'preconditioner': 'amg'})
+    solve(a == L, w,
+          bcs = bc,
+          )#solver_parameters={'linear_solver': 'cg',
+           #                  'preconditioner': 'amg'})
 
     # Write the data out to files.
     #plot(y)
-    yfile << y
+    wfile << w
     t += dt
-    y_1.assign(y)
+    w_1.assign(w)

@@ -137,4 +137,4 @@ Volume(117) = {116};
 Physical Volume("pan") = {115};
 Physical Volume("handle") = {117};
 Physical Volume("steak") = {1};
-Physical Surface("surf1") = {53};
+Physical Surface("panbottom") = {53};
