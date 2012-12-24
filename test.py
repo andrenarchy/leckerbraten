@@ -12,8 +12,8 @@ normstr = '(x[0]*x[0]+ x[1]*x[1] + x[2]*x[2])'
 u_ex = Expression('sin(pi*t)*exp(-' + normstr + ')', t=0)
 f = Expression('(pi*cos(pi*t) - sin(pi*t)*(4*' + normstr + ' - 6))*exp(-' + normstr + ')', t=0)
 
-mesh = UnitCube(2,2,2)
-# mesh = Mesh('msh_pan.xml')
+#mesh = UnitCube(2,2,2)
+mesh = Mesh('msh_pan.xml')
 
 def solve_heat(mesh, p, scale_dt=1.0):
     hmax = mesh.hmax()
@@ -56,7 +56,7 @@ def solve_heat(mesh, p, scale_dt=1.0):
 
 hmaxs = []
 errors = []
-P = range(0,4)
+P = range(0,3)
 for p in P:
     hmax, err = solve_heat(mesh, p, 0.2)
     hmaxs += [hmax]
