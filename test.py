@@ -15,18 +15,20 @@ f = Expression('(pi*cos(pi*t) - sin(pi*t)*(4*' + normstr + ' - 6))*exp(-' + norm
 mesh = UnitCube(2,2,2)
 # mesh = Mesh('msh_pan.xml')
 
-def solve_heat(mesh, p):
+def solve_heat(mesh, p, scale_dt=1.0):
     hmax = mesh.hmax()
     V = FunctionSpace(mesh, 'CG', 1)
     u = TrialFunction(V)
     v = TestFunction(V)
     bc = DirichletBC(V, u_ex, 'on_boundary')
 
-    t = 0
-    u_ex.t = 0
-    f.t = 0
-    dt = 1./(2**p)
-    tend = 2
+    t = 0.
+    u_ex.t = t
+    f.t = t
+    dt = scale_dt/(2**p)
+    tend = 1.
+
+    print("Solve with hmax=%e (%d unknowns) and dt=%e." % (hmax, V.dim(), dt))
 
     Avar = u*v*dx + dt*inner(grad(u),grad(v))*dx
 
@@ -40,10 +42,12 @@ def solve_heat(mesh, p):
         t += dt
         u_ex.t = t
         f.t = t
-        print(t)
 
         bvar = (u_old + dt*f)*v*dx
-        solve( Avar == bvar, u_new, bc)
+
+        A, b = assemble_system(Avar, bvar, bc)
+
+        solve(A, u_new.vector(), b, "cg", "amg")
 
         u_old = u_new.copy()
         L2errors += [errornorm(u_ex,u_new)]
@@ -54,7 +58,7 @@ hmaxs = []
 errors = []
 P = range(0,4)
 for p in P:
-    hmax, err = solve_heat(mesh, p)
+    hmax, err = solve_heat(mesh, p, 0.2)
     hmaxs += [hmax]
     errors += [err]
     mesh = refine(mesh)
