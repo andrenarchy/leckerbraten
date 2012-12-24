@@ -1,7 +1,8 @@
 '''
 Omega: [0,1]^3
+PDE: u_t - div(lambd * grad(u)) = f
 solution: u(x,t) = sin(pi*t)*exp(-norm(x)^2)
-=> rhs:   f(x,t) = (pi*cos(pi*t) - sin(pi*t)*(4*norm(x)^2 - 6))*exp(-norm(x)^2)
+=> rhs:   f(x,t) = (pi*cos(pi*t) - sin(pi*t)*( (1+norm(x)^2)*(4*norm(x)^2 - 6) - 4*norm(x)^2 )*exp(-norm(x)^2)
 '''
 
 from dolfin import *
