@@ -9,16 +9,21 @@ import numpy as np
 from matplotlib import pyplot as pp
 
 normstr = '(x[0]*x[0]+ x[1]*x[1] + x[2]*x[2])'
+
+# heat diffusivity
+lambd = Expression('1 + ' + normstr)
+lambd_grad = Expression( ('2*x[0]', '2*x[1]', '2*x[2]') )
+
 u_ex = Expression('sin(pi*t)*exp(-' + normstr + ')', t=0)
-f = Expression('(pi*cos(pi*t) - sin(pi*t)*(4*' + normstr + ' - 6))*exp(-' + normstr + ')', t=0)
+f = Expression('(pi*cos(pi*t) - sin(pi*t)*( (1 + '+normstr+')*(4*' + normstr + ' - 6) - 4*'+normstr+' ) )*exp(-' + normstr + ')', t=0)
 u_ex_grad = Expression( (
         '-2*sin(pi*t)*x[0]*exp(-' + normstr + ')',
         '-2*sin(pi*t)*x[1]*exp(-' + normstr + ')',
         '-2*sin(pi*t)*x[2]*exp(-' + normstr + ')'
         ), t=0)
+
 # robin boundary -dot(grad(u),n) = alpha*(u - q)
 alpha = Constant(1.0)
-
 class RobinBoundary(SubDomain):
     def inside(self, x, on_boundary):
         return x[0]<0.5
@@ -49,7 +54,7 @@ def solve_heat(mesh, p, boundaries=None, scale_dt=1.0):
 
     print("Solve with hmax=%e (%d unknowns) and dt=%e." % (hmax, V.dim(), dt))
 
-    Avar = u*v*dx + dt*inner(grad(u),grad(v))*dx + dt*alpha*u*v*ds(1)
+    Avar = u*v*dx + dt*inner(lambd*grad(u),grad(v))*dx + dt*lambd*alpha*u*v*ds(1)
     # Robin boundary function
     q = u_ex + (1/alpha)*dot(u_ex_grad, n)
 
@@ -65,7 +70,7 @@ def solve_heat(mesh, p, boundaries=None, scale_dt=1.0):
         f.t = t
         u_ex_grad.t = t
 
-        bvar = (u_old + dt*f)*v*dx + dt*alpha*q*v*ds(1)
+        bvar = (u_old + dt*f)*v*dx + dt*lambd*alpha*q*v*ds(1)
 
         A, b = assemble_system(Avar, bvar, bc, exterior_facet_domains=boundaries)
 
@@ -78,7 +83,7 @@ def solve_heat(mesh, p, boundaries=None, scale_dt=1.0):
 
 hmaxs = []
 errors = []
-P = range(0,3)
+P = range(0,4)
 for p in P:
     # mark Robin boundary condition
     boundaries = MeshFunction("uint", mesh, mesh.topology().dim()-1)
