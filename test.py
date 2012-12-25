@@ -30,9 +30,11 @@ class RobinBoundary(SubDomain):
         return x[0]<0.5
 
 mesh = UnitCube(2,2,2)
-#mesh = Mesh('msh_pan.xml')
+#mesh = Mesh('msh_pan_2407.xml')
 
-def solve_heat(mesh, p, boundaries=None, scale_dt=1.0):
+def solve_heat(mesh, boundaries=None, scale_dt=1.0):
+    # make sure you use high quality meshes, 
+    # i.e. hmin/hmax should be close to 1
     hmax = mesh.hmax()
     V = FunctionSpace(mesh, 'CG', 1)
     u = TrialFunction(V)
@@ -50,10 +52,10 @@ def solve_heat(mesh, p, boundaries=None, scale_dt=1.0):
     t = 0.
     u_ex.t = t
     f.t = t
-    dt = scale_dt/(2**p)
+    dt = scale_dt*hmax
     tend = 1.
 
-    print("Solve with hmax=%e (%d unknowns) and dt=%e." % (hmax, V.dim(), dt))
+    print("Solve with hmax=%e (%d unknowns) and dt=%e (hmin/hmax=%e)." % (hmax, V.dim(), dt, mesh.hmin()/hmax))
 
     Avar = u*v*dx + dt*inner(lambd*grad(u),grad(v))*dx + dt*lambd*alpha*u*v*ds(1)
     # Robin boundary function
@@ -80,7 +82,7 @@ def solve_heat(mesh, p, boundaries=None, scale_dt=1.0):
         u_old = u_new.copy()
         L2errors += [errornorm(u_ex,u_new)]
 
-    return hmax, max(L2errors)
+    return max(L2errors)
 
 hmaxs = []
 errors = []
@@ -92,9 +94,8 @@ for p in P:
     robin = RobinBoundary()
     robin.mark(boundaries, 1)
 
-    hmax, err = solve_heat(mesh, p, boundaries=boundaries, scale_dt=0.2)
-    hmaxs += [hmax]
-    errors += [err]
+    errors += [solve_heat(mesh, boundaries=boundaries, scale_dt=0.2)]
+    hmaxs += [mesh.hmax()]
     mesh = refine(mesh)
 
 hmaxs = np.array(hmaxs)
