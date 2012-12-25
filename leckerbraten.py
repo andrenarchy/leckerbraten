@@ -1,6 +1,112 @@
 from dolfin import *
 import numpy
 
+# robin boundary -dot(grad(u),n) = alpha*(u - q)
+class RobinBC:
+    def __init__(self, alpha, q):
+        self.alpha = alpha
+        self.q = q
+
+def solve_heat(mesh, u_init=Constant(0.0), lambd=Constant(1.0), f=Constant(0.0), boundaries=None, dbcs={}, rbcs={}, expressions=[], scale_dt=1.0, u_ex=None):
+    '''Solve the heat equation.
+
+    Solve the heat equation
+        u_t - div(lambd * grad(u)) = f          in omega
+    with Dirichlet boundary conditions
+                                 u = dbcs[tag]  on boundary tagged as 'tag'
+    and Robin boundary conditions
+                   -dot(grad(u),n) = rbcs[tag].alpha*(u - rbcs[tag].q) on boundary tagged as 'tag'
+    Arguments:
+        mesh:   the discretized domain.
+        u_init: initial temperature distribution.
+        lambd:  diffusivity.
+        f:      right hand side.
+        boundaries: MeshFunction with boundary tags.
+                If boundaries is None, the default tag is 0.
+        dbcs:   dictionary mapping boundary tags to the corresponding 
+                Dirichlet boundary function.
+        rbcs:   dictionary mapping boundary tags to the corresponding 
+                RobinBC objects.
+        expressions: list of expressions that need the time to be set in 
+                the time loop.
+        scale_dt: scale of timestep, dt = scale_dt*mesh.hmax().
+        u_ex:   exact solution (if known).
+    '''
+
+    if boundaries is None:
+        boundaries = MeshFunction("uint", mesh, mesh.topology().dim()-1)
+        boundaries.set_all(0)
+    if len(dbcs)==0 and len(rbcs)==0:
+        raise ValueError('Dirichlet or Robin boundary conditions have to be specified (both possible)!')
+
+    # keep a list of all expressions that need the current time
+    expressions = list(expressions)
+    expressions += [lambd, f]
+    for _, bc in dbcs.items():
+        expressions += [bc]
+    for _, bc in rbcs.items():
+        expressions += [bc.alpha]
+        expressions += [bc.q]
+    if u_ex is not None:
+        expressions += [u_ex]
+    # set time in ALL THE expressions
+    def set_time(expressions, t):
+        for expr in expressions:
+            expr.t = t
+    
+    # make sure you use high quality meshes, 
+    # i.e. hmin/hmax should be close to 1. 
+    # the following command can be used for gmsh:
+    #     gmsh -clmax 0.1 -3 -optimize msh_pan.geo
+    hmax = mesh.hmax()
+    V = FunctionSpace(mesh, 'CG', 1)
+    u = TrialFunction(V)
+    v = TestFunction(V)
+    
+    ds = Measure("ds")[boundaries]
+    dbc = [DirichletBC(V, bc, boundaries, tag) for tag, bc in dbcs.items()]
+
+    t = 0.
+    set_time(expressions, t)
+    dt = scale_dt*hmax
+    tend = 1.
+
+    print("Solve with hmax=%e (%d unknowns) and dt=%e (hmin/hmax=%e)." % (hmax, V.dim(), dt, mesh.hmin()/hmax))
+
+    Avar = u*v*dx + dt*inner(lambd*grad(u),grad(v))*dx
+    # incorporate Robin boundary conditions into bilinear form
+    for tag, bc in rbcs.items():
+        Avar += dt*lambd*bc.alpha*u*v*ds(tag)
+
+    L2errors = []
+
+    u_old = Function(V)
+    u_old.interpolate(u_init)
+    u_new = Function(V)
+    u_new = u_old.copy()
+
+    while t<tend:
+        t += dt
+        set_time(expressions, t)
+
+        bvar = (u_old + dt*f)*v*dx
+        for tag, bc in rbcs.items():
+            bvar += dt*lambd*bc.alpha*bc.q*v*ds(tag)
+
+        A, b = assemble_system(Avar, bvar, dbc, exterior_facet_domains=boundaries)
+
+        solve(A, u_new.vector(), b, "cg", "amg")
+
+        u_old = u_new.copy()
+        if u_ex is not None:
+            L2errors += [errornorm(u_ex,u_new)]
+
+    ret = {
+            "u": u_new,
+            "L2errors": L2errors
+            }
+    return ret
+
 def main():
     #parameters['linear_algebra_backend'] = 'uBLAS'
 
