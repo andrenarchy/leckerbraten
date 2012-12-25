@@ -34,7 +34,9 @@ mesh = UnitCube(2,2,2)
 
 def solve_heat(mesh, boundaries=None, scale_dt=1.0):
     # make sure you use high quality meshes, 
-    # i.e. hmin/hmax should be close to 1
+    # i.e. hmin/hmax should be close to 1. 
+    # the following command can be used for gmsh:
+    #     gmsh -clmax 0.1 -3 -optimize msh_pan.geo
     hmax = mesh.hmax()
     V = FunctionSpace(mesh, 'CG', 1)
     u = TrialFunction(V)
