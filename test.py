@@ -23,21 +23,21 @@ class RobinBoundary(SubDomain):
     def inside(self, x, on_boundary):
         return x[0]<0.5
 
-mesh = UnitCube(2,2,2)
+mesh = UnitCubeMesh(2,2,2)
 #mesh = Mesh('msh_pan.xml')
 hmaxs = []
 errors = []
 P = range(0,3)
 for p in P:
     # mark Dirichlet and Robin boundary condition parts
-    boundaries = MeshFunction("uint", mesh, mesh.topology().dim()-1)
+    boundaries = MeshFunction("sizet", mesh, mesh.topology().dim()-1)
     boundaries.set_all(0)
-    
+
     # Dirichlet
     dbcs = {
             0: u_ex
             }
-    
+
     # Robin
     robin = RobinBoundary()
     robin.mark(boundaries, 1)
@@ -46,16 +46,16 @@ for p in P:
     rbcs = {
             1: RobinBC(alpha, u_ex + (1/alpha)*dot(u_ex_grad, n))
             }
-    
-    sol = solve_heat(mesh, 
-            u_init=u_ex, 
-            lambd=lambd, 
-            f=f, 
-            boundaries=boundaries, 
-            dbcs=dbcs, 
-            rbcs=rbcs, 
-            expressions=[u_ex, u_ex_grad], 
-            scale_dt=0.2, 
+
+    sol = solve_heat(mesh,
+            u_init=u_ex,
+            lambd=lambd,
+            f=f,
+            boundaries=boundaries,
+            dbcs=dbcs,
+            rbcs=rbcs,
+            expressions=[u_ex, u_ex_grad],
+            scale_dt=0.2,
             u_ex=u_ex)
 
     errors += [ max(sol["L2errors"]) ]

@@ -23,11 +23,11 @@ def solve_heat(mesh, u_init=Constant(0.), lambd=Constant(1.), f=Constant(0.), bo
         f:      right hand side.
         boundaries: MeshFunction with boundary tags.
                 If boundaries is None, the default tag is 0.
-        dbcs:   dictionary mapping boundary tags to the corresponding 
+        dbcs:   dictionary mapping boundary tags to the corresponding
                 Dirichlet boundary function.
-        rbcs:   dictionary mapping boundary tags to the corresponding 
+        rbcs:   dictionary mapping boundary tags to the corresponding
                 RobinBC objects.
-        expressions: list of expressions that need the time to be set in 
+        expressions: list of expressions that need the time to be set in
                 the time loop.
         scale_dt: scale of timestep, dt = scale_dt*mesh.hmax().
         u_ex:   exact solution (if known).
@@ -53,16 +53,16 @@ def solve_heat(mesh, u_init=Constant(0.), lambd=Constant(1.), f=Constant(0.), bo
     def set_time(expressions, t):
         for expr in expressions:
             expr.t = t
-    
-    # make sure you use high quality meshes, 
-    # i.e. hmin/hmax should be close to 1. 
+
+    # make sure you use high quality meshes,
+    # i.e. hmin/hmax should be close to 1.
     # the following command can be used for gmsh:
     #     gmsh -clmax 0.1 -3 -optimize msh_pan.geo
     hmax = mesh.hmax()
     V = FunctionSpace(mesh, 'CG', 1)
     u = TrialFunction(V)
     v = TestFunction(V)
-    
+
     ds = Measure("ds")[boundaries]
     dbc = [DirichletBC(V, bc, boundaries, tag) for tag, bc in dbcs.items()]
 
@@ -143,7 +143,7 @@ def main():
             'pan': 1.172e-5,
             'handle': 8.2e-8,
             # steak: cf. P.S. Sheridana, N.C. Shilton, http://www.sciencedirect.com/science/article/pii/S0260877401000838
-            'steak': 1.5e-7   
+            'steak': 1.5e-7
             }
 
     # Define a custom Expression().
@@ -155,9 +155,9 @@ def main():
             return
 
     wfile = File('solution.pvd')
-    sol = solve_heat(mesh, 
-            u_init=Constant(293.), 
-            lambd=Lambd(), 
+    sol = solve_heat(mesh,
+            u_init=Constant(293.),
+            lambd=Lambd(),
             boundaries=boundaries,
             rbcs=rbcs,
             tend=30.,
