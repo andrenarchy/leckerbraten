@@ -21,16 +21,15 @@ u_ex_grad = Expression( (
 
 class RobinBoundary(SubDomain):
     def inside(self, x, on_boundary):
-        return x[0]<0.5
+        return on_boundary and x[0] < 0.5
 
 mesh = UnitCubeMesh(2,2,2)
 #mesh = Mesh('msh_pan.xml')
 hmaxs = []
 errors = []
-P = range(0,3)
-for p in P:
+for p in range(3):
     # mark Dirichlet and Robin boundary condition parts
-    boundaries = MeshFunction("sizet", mesh, mesh.topology().dim()-1)
+    boundaries = MeshFunction('sizet', mesh, mesh.topology().dim()-1)
     boundaries.set_all(0)
 
     # Dirichlet
@@ -42,9 +41,9 @@ for p in P:
     robin = RobinBoundary()
     robin.mark(boundaries, 1)
     n = FacetNormal(mesh)
-    alpha = Constant(1.)
+    alpha = Constant(1.0)
     rbcs = {
-            1: RobinBC(alpha, u_ex + (1/alpha)*dot(u_ex_grad, n))
+            1: RobinBC(alpha, u_ex + (1.0/alpha)*dot(u_ex_grad, n))
             }
 
     sol = solve_heat(mesh,
@@ -58,7 +57,8 @@ for p in P:
             scale_dt=0.2,
             u_ex=u_ex)
 
-    errors += [ max(sol["L2errors"]) ]
+    errors += [ max(sol['L2errors']) ]
+
     hmaxs += [mesh.hmax()]
     mesh = refine(mesh)
 

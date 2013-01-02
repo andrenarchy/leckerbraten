@@ -7,7 +7,20 @@ class RobinBC:
         self.alpha = alpha
         self.q = q
 
-def solve_heat(mesh, u_init=Constant(0.), lambd=Constant(1.), f=Constant(0.), boundaries=None, dbcs={}, rbcs={}, expressions=[], t0=0., tend=1., scale_dt=1., wfile=None, u_ex=None):
+def solve_heat(mesh,
+               u_init = Constant(0.),
+               lambd = Constant(1.),
+               f = Constant(0.),
+               boundaries = None,
+               dbcs = {},
+               rbcs = {},
+               expressions = [],
+               t0 = 0.0,
+               tend = 1.0,
+               scale_dt = 1.0,
+               wfile = None,
+               u_ex = None
+               ):
     '''Solve the heat equation.
 
     Solve the heat equation
@@ -34,48 +47,52 @@ def solve_heat(mesh, u_init=Constant(0.), lambd=Constant(1.), f=Constant(0.), bo
     '''
 
     if boundaries is None:
-        boundaries = MeshFunction("uint", mesh, mesh.topology().dim()-1)
+        boundaries = MeshFunction('sizet', mesh, mesh.topology().dim()-1)
         boundaries.set_all(0)
-    if len(dbcs)==0 and len(rbcs)==0:
+    if not dbcs and not rbcs:
         raise ValueError('Dirichlet or Robin boundary conditions have to be specified (both possible)!')
 
     # keep a list of all expressions that need the current time
     expressions = list(expressions)
-    expressions += [lambd, f]
-    for _, bc in dbcs.items():
-        expressions += [bc]
+    expressions.append(lambd)
+    expressions.append(f)
+    expressions.extend(dbcs.values())
     for _, bc in rbcs.items():
         expressions += [bc.alpha]
         expressions += [bc.q]
     if u_ex is not None:
-        expressions += [u_ex]
-    # set time in ALL THE expressions
+        expressions.append(u_ex)
+    for e in expressions:
+        print e
+    # Set time in ALL THE expressions.
+    # TODO this breaks if any of the expressions has no .t available. Fix this.
     def set_time(expressions, t):
-        for expr in expressions:
-            expr.t = t
 
-    # make sure you use high quality meshes,
+    # Make sure you use high quality meshes,
     # i.e. hmin/hmax should be close to 1.
-    # the following command can be used for gmsh:
+    # The following command can be used for gmsh:
     #     gmsh -clmax 0.1 -3 -optimize msh_pan.geo
     hmax = mesh.hmax()
     V = FunctionSpace(mesh, 'CG', 1)
     u = TrialFunction(V)
     v = TestFunction(V)
 
-    ds = Measure("ds")[boundaries]
+    ds = Measure('ds')[boundaries]
     dbc = [DirichletBC(V, bc, boundaries, tag) for tag, bc in dbcs.items()]
 
     t = t0
-    set_time(expressions, t)
-    dt = scale_dt*hmax
+    for e in expressions:
+        e.t = t
+    dt = scale_dt * hmax
 
-    print("Solve with hmax=%e (%d unknowns) and dt=%e (hmin/hmax=%e)." % (hmax, V.dim(), dt, mesh.hmin()/hmax))
+    print('Solve with hmax=%e (%d unknowns) and dt=%e (hmin/hmax=%e).'
+          % (hmax, V.dim(), dt, mesh.hmin()/hmax)
+         )
 
-    Avar = u*v*dx + dt*inner(lambd*grad(u),grad(v))*dx
+    Avar = u*v*dx + dt * inner(lambd*grad(u),grad(v))*dx
     # incorporate Robin boundary conditions into bilinear form
     for tag, bc in rbcs.items():
-        Avar += dt*lambd*bc.alpha*u*v*ds(tag)
+        Avar += dt * lambd * bc.alpha * u * v * ds(tag)
 
     L2errors = []
 
@@ -86,35 +103,38 @@ def solve_heat(mesh, u_init=Constant(0.), lambd=Constant(1.), f=Constant(0.), bo
     u_new = Function(V)
     u_new = u_old.copy()
 
-    while t<tend:
+    while t < tend:
         t += dt
-        set_time(expressions, t)
+        for e in expressions:
+            e.t = t
 
-        bvar = (u_old + dt*f)*v*dx
+        bvar = (u_old + dt*f) * v * dx
         for tag, bc in rbcs.items():
-            bvar += dt*lambd*bc.alpha*bc.q*v*ds(tag)
+            bvar += dt * lambd * bc.alpha * bc.q * v * ds(tag)
 
-        A, b = assemble_system(Avar, bvar, dbc, exterior_facet_domains=boundaries)
+        A, b = assemble_system(Avar, bvar, dbc,
+                               exterior_facet_domains = boundaries
+                               )
 
-        solve(A, u_new.vector(), b, "cg", "amg")
+        solve(A, u_new.vector(), b, 'cg', 'amg')
 
         u_old = u_new.copy()
         if u_ex is not None:
-            L2errors += [errornorm(u_ex,u_new)]
+            L2errors.append(errornorm(u_ex, u_new))
         if wfile is not None:
             wfile << u_new
 
     ret = {
-            "u": u_new,
-            "L2errors": L2errors
+            'u': u_new,
+            'L2errors': L2errors
             }
     return ret
 
 def main():
     mesh = Mesh('msh_pan.xml')
-    subvolumes = MeshFunction('uint', mesh, 'msh_pan_physical_region.xml')
-    #subfacets = MeshFunction('uint', mesh, 'msh_pan_facet_region.xml', )
-    boundaries = MeshFunction("uint", mesh, mesh.topology().dim()-1)
+    subvolumes = MeshFunction('sizet', mesh, 'msh_pan_physical_region.xml')
+    #subfacets = MeshFunction('sizet', mesh, 'msh_pan_facet_region.xml', )
+    boundaries = MeshFunction('sizet', mesh, mesh.topology().dim()-1)
     boundaries.set_all(0)
     rbcs = {
             0: RobinBC(Constant(1.), Constant(293.))
