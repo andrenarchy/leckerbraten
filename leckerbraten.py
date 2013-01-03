@@ -67,6 +67,14 @@ def solve_heat(mesh,
     # Set time in ALL THE expressions.
     # TODO this breaks if any of the expressions has no .t available. Fix this.
     def set_time(expressions, t):
+        for expr in expressions:
+            # TODO Well, well. If any of the expressions has a Sum(), in which
+            #      one component has the parameter 't', that parameter is not
+            #      going to get set. With hasattr(), this fails silently,
+            #      otherwise an exception would be raised. This is something
+            #      that needs to be fixed in any case.
+            if hasattr(expr, 't'):
+                expr.t = t
 
     # Make sure you use high quality meshes,
     # i.e. hmin/hmax should be close to 1.
@@ -81,8 +89,7 @@ def solve_heat(mesh,
     dbc = [DirichletBC(V, bc, boundaries, tag) for tag, bc in dbcs.items()]
 
     t = t0
-    for e in expressions:
-        e.t = t
+    set_time(expressions, t)
     dt = scale_dt * hmax
 
     print('Solve with hmax=%e (%d unknowns) and dt=%e (hmin/hmax=%e).'
@@ -105,8 +112,7 @@ def solve_heat(mesh,
 
     while t < tend:
         t += dt
-        for e in expressions:
-            e.t = t
+        set_time(expressions, t)
 
         bvar = (u_old + dt*f) * v * dx
         for tag, bc in rbcs.items():
