@@ -63,8 +63,6 @@ def solve_heat(mesh,
         expressions += [bc.q]
     if u_ex is not None:
         expressions.append(u_ex)
-    for e in expressions:
-        print e
     # Set time in ALL THE expressions.
     # TODO this breaks if any of the expressions has no .t available. Fix this.
     def set_time(expressions, t):
@@ -106,12 +104,14 @@ def solve_heat(mesh,
 
     u_old = Function(V)
     u_old.interpolate(u_init)
+
+    u_new = Function(V, name='temperature')
+    u_new.assign(u_old)
     if wfile is not None:
-        wfile << u_old
-    u_new = Function(V)
-    u_new = u_old.copy()
+        wfile << (u_new, t)
 
     while t < tend:
+        print('Time step %e -> %e   (dt = %e)...' % (t, t+dt, dt))
         t += dt
         set_time(expressions, t)
 
@@ -125,16 +125,15 @@ def solve_heat(mesh,
 
         solve(A, u_new.vector(), b, 'cg', 'amg')
 
-        u_old = u_new.copy()
+        u_old.assign(u_new)
         if u_ex is not None:
             L2errors.append(errornorm(u_ex, u_new))
         if wfile is not None:
-            wfile << u_new
+            wfile << (u_new, t)
 
-    ret = {
-            'u': u_new,
-            'L2errors': L2errors
-            }
+    ret = {'u': u_new,
+           'L2errors': L2errors
+           }
     return ret
 # =============================================================================
 def main():
@@ -161,15 +160,16 @@ def main():
     # Manually specify this. In the future,
     # Dolfin will be able to do this automatically.
     subvolumes_classification = {1: 'pan',
-                                2: 'handle',
-                                3: 'steak'
-                                }
+                                 2: 'handle',
+                                 3: 'steak'
+                                 }
 
     # Setting heat conductivity.
     lambd_values = {
             'pan': 1.172e-5,
             'handle': 8.2e-8,
-            # steak: cf. P.S. Sheridana, N.C. Shilton, http://www.sciencedirect.com/science/article/pii/S0260877401000838
+            # steak: cf. P.S. Sheridana, N.C. Shilton,
+            # http://www.sciencedirect.com/science/article/pii/S0260877401000838
             'steak': 1.5e-7
             }
 
@@ -178,7 +178,8 @@ def main():
         def eval_cell(self, values, x, cell):
             subvolume_id = subvolumes.array()[cell.index]
             clss = subvolumes_classification[subvolume_id]
-            values[0] = 1. #lambd_values[clss]
+            values[0] = lambd_values[clss]
+            #values[0] = 1.0
             return
 
     wfile = XDMFFile('solution.xdmf')
