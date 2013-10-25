@@ -1,12 +1,13 @@
 from dolfin import *
 import numpy
 
+# =============================================================================
 # robin boundary -dot(grad(u),n) = alpha*(u - q)
 class RobinBC:
     def __init__(self, alpha, q):
         self.alpha = alpha
         self.q = q
-
+# =============================================================================
 def solve_heat(mesh,
                u_init = Constant(0.),
                lambd = Constant(1.),
@@ -47,7 +48,7 @@ def solve_heat(mesh,
     '''
 
     if boundaries is None:
-        boundaries = MeshFunction('sizet', mesh, mesh.topology().dim()-1)
+        boundaries = MeshFunction('size_t', mesh, mesh.topology().dim()-1)
         boundaries.set_all(0)
     if not dbcs and not rbcs:
         raise ValueError('Dirichlet or Robin boundary conditions have to be specified (both possible)!')
@@ -135,12 +136,12 @@ def solve_heat(mesh,
             'L2errors': L2errors
             }
     return ret
-
+# =============================================================================
 def main():
     mesh = Mesh('msh_pan.xml')
-    subvolumes = MeshFunction('sizet', mesh, 'msh_pan_physical_region.xml')
-    #subfacets = MeshFunction('sizet', mesh, 'msh_pan_facet_region.xml', )
-    boundaries = MeshFunction('sizet', mesh, mesh.topology().dim()-1)
+    subvolumes = MeshFunction('size_t', mesh, 'msh_pan_physical_region.xml')
+    #subfacets = MeshFunction('size_t', mesh, 'msh_pan_facet_region.xml', )
+    boundaries = MeshFunction('size_t', mesh, mesh.topology().dim()-1)
     boundaries.set_all(0)
     rbcs = {
             0: RobinBC(Constant(1.), Constant(293.))
@@ -180,7 +181,9 @@ def main():
             values[0] = 1. #lambd_values[clss]
             return
 
-    wfile = File('solution.pvd')
+    wfile = XDMFFile('solution.xdmf')
+    wfile.parameters['flush_output'] = True;
+    wfile.parameters['rewrite_function_mesh'] = False;
     sol = solve_heat(mesh,
             u_init=Constant(293.),
             lambd=Lambd(),
@@ -190,6 +193,8 @@ def main():
             scale_dt=0.5,
             wfile=wfile
             )
-
+    return
+# =============================================================================
 if __name__ == '__main__':
     main()
+# =============================================================================
