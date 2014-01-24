@@ -1,26 +1,26 @@
 from dolfin import *
-import numpy
 
-# =============================================================================
+
 # robin boundary -dot(grad(u),n) = alpha*(u - q)
 class RobinBC:
     def __init__(self, alpha, q):
         self.alpha = alpha
         self.q = q
-# =============================================================================
+
+
 def solve_heat(mesh,
-               u_init = Constant(0.),
-               lambd = Constant(1.),
-               f = Constant(0.),
-               boundaries = None,
-               dbcs = {},
-               rbcs = {},
-               expressions = [],
-               t0 = 0.0,
-               tend = 1.0,
-               scale_dt = 1.0,
-               wfile = None,
-               u_ex = None
+               u_init=Constant(0.),
+               lambd=Constant(1.),
+               f=Constant(0.),
+               boundaries=None,
+               dbcs={},
+               rbcs={},
+               expressions=[],
+               t0=0.0,
+               tend=1.0,
+               scale_dt=1.0,
+               wfile=None,
+               u_ex=None
                ):
     '''Solve the heat equation.
 
@@ -51,7 +51,9 @@ def solve_heat(mesh,
         boundaries = MeshFunction('size_t', mesh, mesh.topology().dim()-1)
         boundaries.set_all(0)
     if not dbcs and not rbcs:
-        raise ValueError('Dirichlet or Robin boundary conditions have to be specified (both possible)!')
+        raise ValueError('Dirichlet or Robin boundary conditions have to be'
+                         'specified (both possible)!'
+                         )
 
     # keep a list of all expressions that need the current time
     expressions = list(expressions)
@@ -63,6 +65,7 @@ def solve_heat(mesh,
         expressions += [bc.q]
     if u_ex is not None:
         expressions.append(u_ex)
+
     # Set time in ALL THE expressions.
     # TODO this breaks if any of the expressions has no .t available. Fix this.
     def set_time(expressions, t):
@@ -93,9 +96,9 @@ def solve_heat(mesh,
 
     print('Solve with hmax=%e (%d unknowns) and dt=%e (hmin/hmax=%e).'
           % (hmax, V.dim(), dt, mesh.hmin()/hmax)
-         )
+          )
 
-    Avar = u*v*dx + dt * inner(lambd*grad(u),grad(v))*dx
+    Avar = u*v*dx + dt * inner(lambd*grad(u), grad(v))*dx
     # incorporate Robin boundary conditions into bilinear form
     for tag, bc in rbcs.items():
         Avar += dt * lambd * bc.alpha * u * v * ds(tag)
@@ -120,7 +123,7 @@ def solve_heat(mesh,
             bvar += dt * lambd * bc.alpha * bc.q * v * ds(tag)
 
         A, b = assemble_system(Avar, bvar, dbc,
-                               exterior_facet_domains = boundaries
+                               exterior_facet_domains=boundaries
                                )
 
         solve(A, u_new.vector(), b, 'cg', 'amg')
@@ -135,7 +138,8 @@ def solve_heat(mesh,
            'L2errors': L2errors
            }
     return ret
-# =============================================================================
+
+
 def main():
     mesh = Mesh('msh_pan.xml')
     subvolumes = MeshFunction('size_t', mesh, 'msh_pan_physical_region.xml')
@@ -143,12 +147,12 @@ def main():
     boundaries = MeshFunction('size_t', mesh, mesh.topology().dim()-1)
     boundaries.set_all(0)
     rbcs = {
-            0: RobinBC(Constant(1.), Constant(293.))
-            }
+        0: RobinBC(Constant(1.), Constant(293.))
+        }
 
     class Bottom(SubDomain):
         def inside(self, x, on_boundary):
-            return on_boundary and x[2]<1e-12
+            return on_boundary and x[2] < 1e-12
     bottom = Bottom()
     bottom.mark(boundaries, 1)
 
@@ -166,12 +170,12 @@ def main():
 
     # Setting heat conductivity.
     lambd_values = {
-            'pan': 1.172e-5,
-            'handle': 8.2e-8,
-            # steak: cf. P.S. Sheridana, N.C. Shilton,
-            # http://www.sciencedirect.com/science/article/pii/S0260877401000838
-            'steak': 1.5e-7
-            }
+        'pan': 1.172e-5,
+        'handle': 8.2e-8,
+        # steak: cf. P.S. Sheridana, N.C. Shilton,
+        # http://www.sciencedirect.com/science/article/pii/S0260877401000838
+        'steak': 1.5e-7
+        }
 
     # Define a custom Expression().
     class Lambd(Expression):
@@ -183,19 +187,19 @@ def main():
             return
 
     wfile = XDMFFile('solution.xdmf')
-    wfile.parameters['flush_output'] = True;
-    wfile.parameters['rewrite_function_mesh'] = False;
+    wfile.parameters['flush_output'] = True
+    wfile.parameters['rewrite_function_mesh'] = False
     sol = solve_heat(mesh,
-            u_init=Constant(293.),
-            lambd=Lambd(),
-            boundaries=boundaries,
-            rbcs=rbcs,
-            tend=30.,
-            scale_dt=0.5,
-            wfile=wfile
-            )
+                     u_init=Constant(293.),
+                     lambd=Lambd(),
+                     boundaries=boundaries,
+                     rbcs=rbcs,
+                     tend=30.,
+                     scale_dt=0.5,
+                     wfile=wfile
+                     )
     return
-# =============================================================================
+
+
 if __name__ == '__main__':
     main()
-# =============================================================================
